@@ -6,8 +6,8 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Exchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.core.QueueInformation;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -32,15 +32,27 @@ public class RabbitResourceManager {
 
     public void createExchange(String exchangeName) {
         try {
-            Exchange exchange = new DirectExchange(exchangeName, true, false);
+            Exchange exchange =
+                    new DirectExchange(exchangeName, true, false);
+
             rabbitAdmin.declareExchange(exchange);
+
             log.info("Exchange creado: {}", exchangeName);
+
         } catch (Exception e) {
-            log.error("Error al crear exchange {}: {}", exchangeName, e.getMessage());
+            log.error(
+                    "Error al crear exchange {}: {}",
+                    exchangeName,
+                    e.getMessage()
+            );
         }
     }
 
-    public void createBinding(String queueName, String exchangeName, String routingKey) {
+    public void createBinding(
+            String queueName,
+            String exchangeName,
+            String routingKey) {
+
         try {
             Binding binding = BindingBuilder
                     .bind(new Queue(queueName))
@@ -48,15 +60,54 @@ public class RabbitResourceManager {
                     .with(routingKey);
 
             rabbitAdmin.declareBinding(binding);
-            log.info("Binding creado: {} -> {}", queueName, exchangeName);
+
+            log.info(
+                    "Binding creado: {} -> {} [{}]",
+                    queueName,
+                    exchangeName,
+                    routingKey
+            );
+
         } catch (Exception e) {
-            log.error("Error al crear binding: {}", e.getMessage());
+            log.error(
+                    "Error al crear binding: {}",
+                    e.getMessage()
+            );
+        }
+    }
+
+    public void deleteBinding(
+            String queueName,
+            String exchangeName,
+            String routingKey) {
+
+        try {
+            Binding binding = BindingBuilder
+                    .bind(new Queue(queueName))
+                    .to(new DirectExchange(exchangeName))
+                    .with(routingKey);
+
+            rabbitAdmin.removeBinding(binding);
+
+            log.info(
+                    "Binding eliminado: {} -> {} [{}]",
+                    queueName,
+                    exchangeName,
+                    routingKey
+            );
+
+        } catch (Exception e) {
+            log.error(
+                    "Error al eliminar binding: {}",
+                    e.getMessage()
+            );
         }
     }
 
     public QueueInformation getQueueInfo(String queueName) {
         try {
-            QueueInformation info = rabbitAdmin.getQueueInfo(queueName);
+            QueueInformation info =
+                    rabbitAdmin.getQueueInfo(queueName);
 
             if (info != null) {
                 log.info(
@@ -65,13 +116,20 @@ public class RabbitResourceManager {
                         info.getMessageCount(),
                         info.getConsumerCount()
                 );
+
                 return info;
             }
 
             return null;
 
         } catch (Exception e) {
-            log.error("Error al obtener info de cola {}: {}", queueName, e.getMessage());
+
+            log.error(
+                    "Error al obtener info de cola {}: {}",
+                    queueName,
+                    e.getMessage()
+            );
+
             return null;
         }
     }
@@ -80,8 +138,13 @@ public class RabbitResourceManager {
         try {
             rabbitAdmin.deleteQueue(queueName);
             log.info("Cola eliminada: {}", queueName);
+
         } catch (Exception e) {
-            log.error("Error al eliminar cola {}: {}", queueName, e.getMessage());
+            log.error(
+                    "Error al eliminar cola {}: {}",
+                    queueName,
+                    e.getMessage()
+            );
         }
     }
 
@@ -89,17 +152,32 @@ public class RabbitResourceManager {
         try {
             rabbitAdmin.deleteExchange(exchangeName);
             log.info("Exchange eliminado: {}", exchangeName);
+
         } catch (Exception e) {
-            log.error("Error al eliminar exchange {}: {}", exchangeName, e.getMessage());
+            log.error(
+                    "Error al eliminar exchange {}: {}",
+                    exchangeName,
+                    e.getMessage()
+            );
         }
     }
 
     public void purgeQueue(String queueName) {
         try {
             int purged = rabbitAdmin.purgeQueue(queueName);
-            log.info("Cola purgada: {}, mensajes eliminados: {}", queueName, purged);
+
+            log.info(
+                    "Cola purgada: {}, mensajes eliminados: {}",
+                    queueName,
+                    purged
+            );
+
         } catch (Exception e) {
-            log.error("Error al purgar cola {}: {}", queueName, e.getMessage());
+            log.error(
+                    "Error al purgar cola {}: {}",
+                    queueName,
+                    e.getMessage()
+            );
         }
     }
 }

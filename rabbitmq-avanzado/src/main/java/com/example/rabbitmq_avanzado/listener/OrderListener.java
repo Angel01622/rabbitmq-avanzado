@@ -13,6 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class OrderListener {
 
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long BASE_RETRY_DELAY_MS = 1000;
+
     @RabbitListener(
             queues = RabbitTopologyConfig.ORDERS_QUEUE,
             containerFactory = "manualAckListenerFactory"
@@ -25,41 +28,79 @@ public class OrderListener {
         long deliveryTag =
                 message.getMessageProperties().getDeliveryTag();
 
-        try {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
 
-            log.info("Mensaje recibido: {}", payload);
+            try {
 
-            if (payload.toUpperCase().contains("ERROR")) {
-                throw new RuntimeException(
-                        "Error simulado procesando la orden"
+                log.info(
+                        "Procesando mensaje. Intento {}/{}: {}",
+                        attempt,
+                        MAX_ATTEMPTS,
+                        payload
                 );
+
+                if (payload.toUpperCase().contains("ERROR")) {
+                    throw new RuntimeException(
+                            "Error simulado procesando la orden"
+                    );
+                }
+
+                log.info(
+                        "Orden procesada correctamente: {}",
+                        payload
+                );
+
+                channel.basicAck(deliveryTag, false);
+
+                log.info("ACK enviado correctamente");
+
+                return;
+
+            } catch (Exception e) {
+
+                log.error(
+                        "Falló intento {}/{}: {}",
+                        attempt,
+                        MAX_ATTEMPTS,
+                        e.getMessage()
+                );
+
+                if (attempt < MAX_ATTEMPTS) {
+
+                    long delay =
+                            BASE_RETRY_DELAY_MS * attempt;
+
+                    log.warn(
+                            "Reintentando mensaje en {} ms...",
+                            delay
+                    );
+
+                    try {
+                        Thread.sleep(delay);
+
+                    } catch (InterruptedException interruptedException) {
+
+                        Thread.currentThread().interrupt();
+
+                        log.error(
+                                "Reintento interrumpido"
+                        );
+
+                        break;
+                    }
+                }
             }
-
-            log.info(
-                    "Orden procesada correctamente: {}",
-                    payload
-            );
-
-            channel.basicAck(deliveryTag, false);
-
-            log.info("ACK enviado correctamente");
-
-        } catch (Exception e) {
-
-            log.error(
-                    "Error procesando mensaje: {}",
-                    e.getMessage()
-            );
-
-            channel.basicNack(
-                    deliveryTag,
-                    false,
-                    false
-            );
-
-            log.warn(
-                    "NACK enviado. Mensaje dirigido a DLQ"
-            );
         }
+
+        channel.basicNack(
+                deliveryTag,
+                false,
+                false
+        );
+
+        log.warn(
+                "Se agotaron los reintentos. NACK enviado y mensaje dirigido a DLQ: {}",
+                payload
+        );
     }
 }
